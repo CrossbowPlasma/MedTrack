@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils.translation import gettext_lazy as _
 
+
 class Patient(models.Model):
     GENDER_CHOICES = [
         ('M', _('Male')),
@@ -30,6 +31,7 @@ class Patient(models.Model):
         ordering = ['last_name', 'first_name']
         verbose_name = _('Patient')
         verbose_name_plural = _('Patients')
+
 
 class Procedure(models.Model):
     STATUS_CHOICES = [
@@ -70,6 +72,7 @@ class Procedure(models.Model):
         verbose_name = _('Procedure')
         verbose_name_plural = _('Procedures')
 
+
 class AdminStat(models.Model):
     total_patients = models.IntegerField(default=0)
     total_procedures = models.IntegerField(default=0)
@@ -85,6 +88,7 @@ class AdminStat(models.Model):
         verbose_name = _('Admin Statistic')
         verbose_name_plural = _('Admin Statistics')
 
+
 class Notification(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     message = models.TextField()
@@ -92,6 +96,7 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"Notification for {self.user.username} at {self.created_at}"
+
 
     class Meta:
         ordering = ['-created_at']
