@@ -1,0 +1,16 @@
+# Ignore Python compiled files
+*.pyc
+__pycache__/
+
+# Ignore virtual environment directory
+#venv/
+
+# You can also add other files or directories you want to ignore, such as:
+# .env file for environment variables
+#.env
+
+# Ignore log files
+#*.log
+
+# Ignore database files
+#*.sqlite3
