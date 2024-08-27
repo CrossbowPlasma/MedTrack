@@ -85,8 +85,8 @@ class UserInfoView(APIView):
             users = User.objects.all()
             users_data = []
             for usr in users:
-                role_user = usr.groups.first()  # Ask about this again
-                user_role = role_user.name
+                user_group = usr.groups.first()  # Ask about this again
+                user_role = user_group.name
                 users_data.append({
                     'id': usr.id,
                     'username': usr.username,
@@ -123,7 +123,7 @@ class AdminStatView(APIView):
 
     def get(self, request):
         try:
-            admin_stat = AdminStat.objects.get()#latest('last_updated')
+            admin_stat = AdminStat.objects.get()
         except AdminStat.DoesNotExist:
             return Response({"detail": "No admin stats available."}, status=status.HTTP_404_NOT_FOUND)
 
