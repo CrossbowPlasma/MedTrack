@@ -4,23 +4,27 @@ from .models import Patient, Procedure, AdminStat, Notification
 from django.utils import timezone
 import re
 
+# Serializer for the User model
 class UserSerializer(serializers.ModelSerializer):
+    # Custom field to accept role during user creation
     role = serializers.CharField(write_only=True)
 
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'password', 'role']
+        # Password should only be used for writing, not reading
         extra_kwargs = {
             'password': {'write_only': True}
         }
 
+    # Custom validation for the User model fields
     def validate(self, data):
         username = data.get('username')
         email = data.get('email')
         password = data.get('password')
         role = data.get('role')
 
-        # Validate username
+        # Validate username length and format
         if len(username) > 150:
             raise serializers.ValidationError({"username": "Username must be 150 characters or fewer."})
         if not re.match(r'^[\w.@+-]+$', username):
@@ -28,13 +32,13 @@ class UserSerializer(serializers.ModelSerializer):
         if User.objects.filter(username=username).exists():
             raise serializers.ValidationError({"username": "Username already taken."})
 
-        # Validate email
+        # Validate email format and uniqueness
         if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
             raise serializers.ValidationError({"email": "Enter a valid email address."})
         if User.objects.filter(email=email).exists():
             raise serializers.ValidationError({"email": "Email address already registered."})
 
-        # Validate password
+        # Validate password strength (length, digits, cases, and special characters)
         if len(password) < 8:
             raise serializers.ValidationError({"password": "Password must be at least 8 characters long."})
         if not re.search(r'\d', password):
@@ -46,12 +50,13 @@ class UserSerializer(serializers.ModelSerializer):
         if not re.search(r'[@$!%*?&#]', password):
             raise serializers.ValidationError({"password": "Password must contain at least one special character."})
 
-        # Validate role
+        # Validate the role field to ensure the specified role exists
         if not Group.objects.filter(name=role).exists():
             raise serializers.ValidationError({"role": "Role does not exist."})
 
         return data
 
+    # Create a new user and assign them to a group based on the provided role
     def create(self, validated_data):
         role = validated_data.pop('role')
         user = User(
@@ -61,11 +66,13 @@ class UserSerializer(serializers.ModelSerializer):
         user.set_password(validated_data['password'])
         user.save()
 
+        # Assign the user to the specified role (group)
         group = Group.objects.get(name=role)
         user.groups.add(group)
 
         return user
 
+# Serializer for the Patient model
 class PatientSerializer(serializers.ModelSerializer):
     class Meta:
         model = Patient
@@ -75,10 +82,12 @@ class PatientSerializer(serializers.ModelSerializer):
             'emergency_contact_name', 'emergency_contact_mobile_number', 'language', 'created_date'
         ]
 
+        # `created_date` should be read-only as it's set automatically
         extra_kwargs = {
             'created_date': {'read_only': True}
         } 
 
+    # Custom validation for the Patient model fields
     def validate(self, data):
         gender_mapping = {
             'M': 'Male',
@@ -89,7 +98,7 @@ class PatientSerializer(serializers.ModelSerializer):
             'Other': 'Other'
         }
 
-        # Validate mobile numbers
+        # Validate mobile number format (10 digits)
         mobile_number = data.get('mobile_number')
         emergency_contact_mobile_number = data.get('emergency_contact_mobile_number')
 
@@ -99,26 +108,28 @@ class PatientSerializer(serializers.ModelSerializer):
         if len(emergency_contact_mobile_number) != 10 or not emergency_contact_mobile_number.isdigit():
             raise serializers.ValidationError({"emergency_contact_mobile_number": "Emergency contact mobile number must be exactly 10 digits."})
         
-        # Validate pincode length
+        # Validate pincode length (6 digits)
         if len(data.get('pincode', '')) != 6:
             raise serializers.ValidationError({"pincode": "Pincode must be 6 digits long."})
 
-        # Validate gender
+        # Validate gender input and standardize it using a mapping
         gender = data.get('gender').capitalize()
         if gender not in gender_mapping:
             raise serializers.ValidationError({"gender": "Gender must be one of the following: Male, Female, Others or M, F, O"})
         data['gender'] = gender_mapping.get(gender, gender)
 
-        # Validate email
+        # Validate email format
         email = data.get('email')
         if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
             raise serializers.ValidationError({"email": "Enter a valid email address."})
 
         return data
 
+# Serializer for the Procedure model
 class ProcedureSerializer(serializers.ModelSerializer):
-    patient = PatientSerializer(read_only = True)
-    created_by = UserSerializer(read_only = True)
+    # Include nested serializers for patient and created_by fields
+    patient = PatientSerializer(read_only=True)
+    created_by = UserSerializer(read_only=True)
 
     class Meta:
         model = Procedure
@@ -127,13 +138,15 @@ class ProcedureSerializer(serializers.ModelSerializer):
             'procedure_name', 'clinic_address', 'notes', 'report', 'created_by', 'created_date', 'updated_date'
         ]
 
+        # `created_date` and `updated_date` are read-only as they are set automatically
         extra_kwargs = {
             'created_date': {'read_only': True},
             'updated_date': {'read_only': True},
         } 
 
+    # Custom validation for the Procedure model fields
     def validate(self, data):
-        # Validate status if provided
+        # Validate the status field if provided
         if 'status' in data:
             status = data.get('status').lower()
             valid_statuses = ['preparation', 'in-progress', 'not-done', 'on-hold', 'stopped', 'completed', 'entered-in-error', 'unknown']
@@ -141,7 +154,7 @@ class ProcedureSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({"status": f"Status must be one of the following: {', '.join(valid_statuses)}."})
             data['status'] = status
 
-        # Validate category if provided
+        # Validate the category field if provided
         if 'category' in data:
             category = data.get('category').lower()
             valid_categories = ['psychiatry', 'counseling', 'surgical', 'diagnostic', 'chiropractic', 'social-service']
@@ -149,7 +162,7 @@ class ProcedureSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({"category": f"Category must be one of the following: {', '.join(valid_categories)}."})
             data['category'] = category
 
-        # Validate procedure_datetime if provided
+        # Validate the procedure_datetime field to ensure it is not in the future
         if 'procedure_datetime' in data:
             procedure_datetime = data.get('procedure_datetime')
             if procedure_datetime > timezone.now():
@@ -157,6 +170,7 @@ class ProcedureSerializer(serializers.ModelSerializer):
 
         return data
     
+# Serializer for the AdminStat model
 class AdminStatSerializer(serializers.ModelSerializer):
     class Meta:
         model = AdminStat
@@ -165,6 +179,7 @@ class AdminStatSerializer(serializers.ModelSerializer):
             'doctor_users', 'admin_users', 'last_updated'
         ]
 
+# Serializer for the Notification model
 class NotificationSerializer(serializers.ModelSerializer):
     user = UserSerializer()
 

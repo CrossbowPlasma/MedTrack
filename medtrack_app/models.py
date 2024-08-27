@@ -72,7 +72,7 @@ class Notification(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Notification for {self.user.username} at {self.created_at}"
+        return f"Notification for {self.user.username} at {self.timestamp}"
     
     class Meta:
         ordering = ['-timestamp']
