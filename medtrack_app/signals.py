@@ -9,7 +9,7 @@ patient_created = Signal()
 def role_count_update(sender, instance, action, **kwargs):
     if action == 'post_add':
         admin_stat, _ = AdminStat.objects.get_or_create(pk=1)
-        group = str(instance.groups.first())
+        group = instance.groups.first().name
         if group == 'Front_Desk':
             admin_stat.front_desk_users += 1
         elif group == 'Doctor':

@@ -1,14 +1,14 @@
 from django.contrib.auth import authenticate
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import User
 from rest_framework import status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.exceptions import TokenError
 import base64
 from .models import Notification, AdminStat, Patient, Procedure
-from .serializers import NotificationSerializer, AdminStatSerializer, PatientSerializer, ProcedureSerializer
+from .serializers import NotificationSerializer, AdminStatSerializer, PatientSerializer, ProcedureSerializer, UserSerializer
 from .signals import patient_created
+from .permissions import IsAdmin, IsDoctor, IsFrontDesk
 
 
 class CustomLoginView(APIView):
@@ -45,28 +45,13 @@ class CustomLoginView(APIView):
 
 class RegisterView(APIView):
     def post(self, request, *args, **kwargs):
-        username = request.data.get('username')
-        email = request.data.get('email')
-        password = request.data.get('password')
-        role = request.data.get('role')
-
-        if not username or not email or not password or not role:
-            return Response({"error": "Username, email, and password and role are required."}, status=status.HTTP_400_BAD_REQUEST)
-
-        if User.objects.filter(username=username).exists():
-            return Response({"error": "Username already exists."}, status=status.HTTP_400_BAD_REQUEST)
-
-        if User.objects.filter(email=email).exists():
-            return Response({"error": "Email already exists."}, status=status.HTTP_400_BAD_REQUEST)
-
-        group = Group.objects.filter(name=role).first()
-        if group:
-            user = User.objects.create_user(username=username, email=email, password=password)
-            user.groups.add(group)
-        else:
-            return Response({"error": "Role does not exist."}, status=status.HTTP_400_BAD_REQUEST)
-
-        return Response({"message": "User registered successfully."}, status=status.HTTP_201_CREATED)
+        serializer = UserSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "User registered successfully."}, status=status.HTTP_201_CREATED)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class LogoutView(APIView):
@@ -91,34 +76,32 @@ class UserInfoView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        try:
-            user = request.user
-            role = user.groups.first().name
-            
-            if role == "Admin":
-                # If the user is an Admin, return a list of all users
-                users = User.objects.all()
-                users_data = []
-                for usr in users:
-                    user_role = usr.groups.first().name if usr.groups.exists() else None
-                    users_data.append({
-                        'id': usr.id,
-                        'username': usr.username,
-                        'email': usr.email,
-                        'role': user_role,
-                    })
-                return Response(users_data, status=status.HTTP_200_OK)
-            else:
-                # If the user is not an Admin, return only their own info
-                return Response({
-                    'id': user.id,
-                    'username': user.username,
-                    'email': user.email,
-                    'role': role,
-                }, status=status.HTTP_200_OK)
 
-        except TokenError:
-            return Response({"error": "Invalid token or token has expired."}, status=status.HTTP_401_UNAUTHORIZED)
+        user = request.user
+        role = user.groups.first().name
+        
+        if role == "Admin":
+            # If the user is an Admin, return a list of all users
+            users = User.objects.all()
+            users_data = []
+            for usr in users:
+                role_user = usr.groups.first()  # Ask about this again
+                user_role = role_user.name
+                users_data.append({
+                    'id': usr.id,
+                    'username': usr.username,
+                    'email': usr.email,
+                    'role': user_role,
+                })
+            return Response(users_data, status=status.HTTP_200_OK)
+        else:
+            # If the user is not an Admin, return only their own info
+            return Response({
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'role': role,
+            }, status=status.HTTP_200_OK)
 
         
 class NotificationView(APIView):
@@ -136,15 +119,11 @@ class NotificationView(APIView):
 
 
 class AdminStatView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request):
-        # Check if the user is in the Admin group
-        if not request.user.groups.filter(name='Admin').exists():
-            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
-
         try:
-            admin_stat = AdminStat.objects.latest('last_updated')
+            admin_stat = AdminStat.objects.get()#latest('last_updated')
         except AdminStat.DoesNotExist:
             return Response({"detail": "No admin stats available."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -152,13 +131,28 @@ class AdminStatView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
     
 
-class CreatePatientView(APIView):
+class PatientView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin | IsFrontDesk]
+
+    def get(self, request):
+        # Handle GET requests to list patients
+        name = request.query_params.get('name', None)
+        patient_city = request.query_params.get('city', None)
+
+        if name and patient_city:
+            patients = Patient.objects.filter(first_name__icontains=name, city=patient_city)
+        elif name:
+            patients = Patient.objects.filter(first_name__icontains=name)
+        elif patient_city:
+            patients = Patient.objects.filter(city=patient_city)
+        else:
+            patients = Patient.objects.all()
+
+        serializer = PatientSerializer(patients, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
     def post(self, request):
-        # Check if the user is in the Front_Desk or Admin group
-        user_groups = request.user.groups.values_list('name', flat=True)
-        if not ('Front_Desk' in user_groups or 'Admin' in user_groups):
-            return Response({"detail": "You do not have permission to create patients."}, status=status.HTTP_403_FORBIDDEN)
-        
+        # Handle POST requests to create a new patient
         serializer = PatientSerializer(data=request.data)
         if serializer.is_valid():
             patient = serializer.save()
@@ -169,73 +163,39 @@ class CreatePatientView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class ListPatientView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+class ProcedureView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin | IsDoctor]
 
     def get(self, request):
-        # Check if the user is in the Front_Desk or Admin group
-        user_groups = request.user.groups.values_list('name', flat=True)
-        if 'Front_Desk' not in user_groups and 'Admin' not in user_groups:
-            return Response({"detail": "You do not have permission to view patients."}, status=status.HTTP_403_FORBIDDEN)
-
-        name = request.query_params.get('name', None)
-        patient_id = request.query_params.get('id', None)
-
-        if name:
-            patients = Patient.objects.filter(first_name__icontains=name)
-        elif patient_id:
-            patients = Patient.objects.filter(id=patient_id)
+        # Handle GET requests to list procedure
+        patient_id = request.query_params.get('patient_id')
+        if patient_id:
+            try:
+                procedures = Procedure.objects.filter(patient_id=patient_id)
+            except Procedure.DoesNotExist:
+                return Response({"error": "No procedures found for the given patient ID."}, status=status.HTTP_404_NOT_FOUND)
         else:
-            patients = Patient.objects.all()
+            procedures = Procedure.objects.all()
 
-        serializer = PatientSerializer(patients, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-class CreateProcedureView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
+        serializer = ProcedureSerializer(procedures, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)    
+    
     def post(self, request):
-        # Check if the user is in the Doctor or Admin group
-        user_groups = request.user.groups.values_list('name', flat=True)
-        if 'Doctor' not in user_groups and 'Admin' not in user_groups:
-            return Response({"detail": "You do not have permission to create procedures."}, status=status.HTTP_403_FORBIDDEN)
-
+        # Handle POST requests to create a new procedure
         patient_id = request.data.get('patient')
-        if not Patient.objects.filter(id=patient_id).exists():
+        try:
+            patient = Patient.objects.get(id=patient_id)
+        except Patient.DoesNotExist:
             return Response({"patient": "Patient does not exist."}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = ProcedureSerializer(data=request.data)
         if serializer.is_valid():
-            procedure = serializer.save(created_by=request.user)
+            procedure = serializer.save(patient=patient, created_by=request.user)
             return Response(ProcedureSerializer(procedure).data, status=status.HTTP_201_CREATED)
-
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-class ListProcedureView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        # Check if the user is in the Doctor or Admin group
-        user_groups = request.user.groups.values_list('name', flat=True)
-        if 'Doctor' not in user_groups and 'Admin' not in user_groups:
-            return Response({"detail": "You do not have permission to view procedures."}, status=status.HTTP_403_FORBIDDEN)
-
-        procedures = Procedure.objects.all()
-        serializer = ProcedureSerializer(procedures, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
- 
     
-class UpdateProcedureView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
     def put(self, request, pk):
-        # Check if the user is in the Doctor or Admin group
-        user_groups = request.user.groups.values_list('name', flat=True)
-        if 'Doctor' not in user_groups and 'Admin' not in user_groups:
-            return Response({"detail": "You do not have permission to edit procedures."}, status=status.HTTP_403_FORBIDDEN)
-
+        # Handle PUT requests to update procedure
         try:
             procedure = Procedure.objects.get(pk=pk)
         except Procedure.DoesNotExist:
