@@ -182,7 +182,7 @@ class PatientView(APIView):
         if gender:
             if gender not in gender_mapping:
                 return Response({"gender": "Gender must be one of the following: Male, Female, Others or M, F, O"}, status=status.HTTP_400_BAD_REQUEST)
-            data['gender'] = gender_mapping.get(gender)
+            data['gender'] = gender_mapping[gender]
 
         serializer = PatientSerializer(data=data)
         if serializer.is_valid():
