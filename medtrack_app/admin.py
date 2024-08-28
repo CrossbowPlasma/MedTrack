@@ -12,7 +12,7 @@ class PatientAdmin(admin.ModelAdmin):
 @admin.register(Procedure)
 class ProcedureAdmin(admin.ModelAdmin):
     list_display = ('procedure_name', 'patient', 'status', 'created_by', 'created_date', 'updated_date')
-    readonly_fields = ('patient', 'created_by', 'created_date', 'updated_date')
+    readonly_fields = ('created_by', 'created_date', 'updated_date')
     list_filter = ('status', 'created_date', 'updated_date')
     search_fields = ('procedure_name', 'patient__first_name', 'patient__last_name')
     ordering = ('-created_date',)

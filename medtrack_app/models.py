@@ -4,18 +4,24 @@ from django.utils.translation import gettext_lazy as _
 
 
 class Patient(models.Model):
+    GENDER_CHOICES = [
+        ('Male', 'Male'),
+        ('Female', 'Female'),
+        ('Other', 'Other'),
+    ]
+
     first_name = models.CharField(max_length=50)
     last_name = models.CharField(max_length=50)
-    mobile_number = models.CharField()
+    mobile_number = models.CharField(max_length=10)
     address = models.TextField()
-    gender = models.CharField()
+    gender = models.CharField(choices=GENDER_CHOICES)
     birthdate = models.DateField()
     email = models.EmailField()
     city = models.CharField(max_length=100)
     state = models.CharField(max_length=100)
-    pincode = models.CharField()
+    pincode = models.CharField(max_length=6)
     emergency_contact_name = models.CharField(max_length=100)
-    emergency_contact_mobile_number = models.CharField()
+    emergency_contact_mobile_number = models.CharField(max_length=10)
     language = models.CharField(max_length=50)
     created_date = models.DateTimeField(auto_now_add=True)
 
@@ -29,10 +35,30 @@ class Patient(models.Model):
 
 
 class Procedure(models.Model):
+    STATUS_CHOICES = [
+        ('preparation', _('Preparation')),
+        ('in-progress', _('In Progress')),
+        ('not-done', _('Not Done')),
+        ('on-hold', _('On Hold')),
+        ('stopped', _('Stopped')),
+        ('completed', _('Completed')),
+        ('entered-in-error', _('Entered in Error')),
+        ('unknown', _('Unknown')),
+    ]
+
+    CATEGORY_CHOICES = [
+        ('psychiatry', _('Psychiatry procedure or service')),
+        ('counseling', _('Counseling')),
+        ('surgical', _('Surgical procedure')),
+        ('diagnostic', _('Diagnostic procedure')),
+        ('chiropractic', _('Chiropractic manipulation')),
+        ('social-service', _('Social service procedure')),
+    ]
+
     patient = models.ForeignKey('Patient', on_delete=models.CASCADE, related_name='procedures')
-    status = models.CharField()
+    status = models.CharField(choices=STATUS_CHOICES)
     procedure_datetime = models.DateTimeField()
-    category = models.CharField()
+    category = models.CharField(choices=CATEGORY_CHOICES)
     procedure_name = models.CharField(max_length=100)
     clinic_address = models.TextField()
     notes = models.TextField(blank=True, null=True)
