@@ -168,8 +168,21 @@ class PatientView(APIView):
 
     def post(self, request):
         # Handle POST requests to create a new patient
+        gender_mapping = {
+            'M': 'Male',
+            'F': 'Female',
+            'O': 'Other',
+            'Male': 'Male',
+            'Female': 'Female',
+            'Other': 'Other'
+        }
+
         data = request.data.copy()
-        data['gender'] = data['gender'].capitalize()
+        gender = data.get('gender').capitalize()
+        if gender:
+            if gender not in gender_mapping:
+                return Response({"gender": "Gender must be one of the following: Male, Female, Others or M, F, O"}, status=status.HTTP_400_BAD_REQUEST)
+            data['gender'] = gender_mapping.get(gender)
 
         serializer = PatientSerializer(data=data)
         if serializer.is_valid():
@@ -212,8 +225,10 @@ class ProcedureView(APIView):
             return Response({"patient": "Patient does not exist."}, status=status.HTTP_404_NOT_FOUND)
 
         data = request.data.copy()
-        data['status'] = data['status'].lower()
-        data['category'] = data['category'].lower()
+        if data.get('status'):
+            data['status'] = data['status'].lower()
+        if data.get('category'):
+            data['category'] = data['category'].lower()
 
         # Serialize and validate the procedure data
         serializer = ProcedureSerializer(data=data)

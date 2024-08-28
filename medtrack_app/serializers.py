@@ -90,14 +90,6 @@ class PatientSerializer(serializers.ModelSerializer):
 
     # Custom validation for the Patient model fields
     def validate(self, data):
-        # gender_mapping = {
-        #     'M': 'Male',
-        #     'F': 'Female',
-        #     'O': 'Other',
-        #     'Male': 'Male',
-        #     'Female': 'Female',
-        #     'Other': 'Other'
-        # }
 
         # Validate mobile number format (10 digits)
         mobile_number = data.get('mobile_number')
@@ -112,12 +104,6 @@ class PatientSerializer(serializers.ModelSerializer):
         # Validate pincode length (6 digits)
         if len(data.get('pincode', '')) != 6:
             raise serializers.ValidationError({"pincode": "Pincode must be 6 digits long."})
-
-        # Validate gender input and standardize it using a mapping
-        # gender = data.get('gender').capitalize()
-        # if gender not in gender_mapping:
-        #     raise serializers.ValidationError({"gender": "Gender must be one of the following: Male, Female, Others or M, F, O"})
-        # data['gender'] = gender_mapping.get(gender, gender)
 
         # Validate email format
         email = data.get('email')
