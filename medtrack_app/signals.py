@@ -1,7 +1,8 @@
-from django.db.models.signals import post_save, m2m_changed
+from django.db.models.signals import pre_save, post_save, post_delete, m2m_changed
 from django.contrib.auth.models import User
 from django.dispatch import receiver, Signal
 from .models import Procedure, Notification, AdminStat
+import os
 
 # Custom signal to indicate when a patient is created
 patient_created = Signal()
@@ -50,3 +51,21 @@ def procedure_created_or_updated(sender, instance, created, **kwargs):
         admin_stat, _ = AdminStat.objects.get_or_create(pk=1)
         admin_stat.total_procedures += 1
         admin_stat.save()
+
+@receiver(pre_save, sender=Procedure)
+def delete_old_file_on_update(sender, instance, **kwargs):
+    if instance.pk:
+        try:
+            old_file = Procedure.objects.get(pk=instance.pk).report
+        except Procedure.DoesNotExist:
+            return
+        else:
+            if old_file and old_file != instance.report:
+                if os.path.isfile(old_file.path):
+                    os.remove(old_file.path)
+
+@receiver(post_delete, sender=Procedure)
+def delete_file_on_delete(sender, instance, **kwargs):
+    if instance.report:
+        if os.path.isfile(instance.report.path):
+            os.remove(instance.report.path)
