@@ -1,5 +1,6 @@
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from django.core.files.uploadedfile import UploadedFile
 from rest_framework import status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -167,7 +168,10 @@ class PatientView(APIView):
 
     def post(self, request):
         # Handle POST requests to create a new patient
-        serializer = PatientSerializer(data=request.data)
+        data = request.data.copy()
+        data['gender'] = data['gender'].capitalize()
+
+        serializer = PatientSerializer(data=data)
         if serializer.is_valid():
             patient = serializer.save()
             
@@ -207,8 +211,12 @@ class ProcedureView(APIView):
         except Patient.DoesNotExist:
             return Response({"patient": "Patient does not exist."}, status=status.HTTP_404_NOT_FOUND)
 
+        data = request.data.copy()
+        data['status'] = data['status'].lower()
+        data['category'] = data['category'].lower()
+
         # Serialize and validate the procedure data
-        serializer = ProcedureSerializer(data=request.data)
+        serializer = ProcedureSerializer(data=data)
         if serializer.is_valid():
             # Save the procedure and associate it with the patient and user
             procedure = serializer.save(patient=patient, created_by=request.user)
@@ -222,9 +230,15 @@ class ProcedureView(APIView):
             procedure = Procedure.objects.get(pk=pk)
         except Procedure.DoesNotExist:
             return Response({"detail": "Procedure not found."}, status=status.HTTP_404_NOT_FOUND)
+        
+        data = request.data.copy()
+        if data.get('status'):
+            data['status'] = data['status'].lower()
+        if data.get('category'):
+            data['category'] = data['category'].lower()
 
         # Serialize and validate the update data
-        serializer = ProcedureSerializer(procedure, data=request.data, partial=True)
+        serializer = ProcedureSerializer(procedure, data=data, partial=True)
         if serializer.is_valid():
             # Save the updated procedure data
             serializer.save()

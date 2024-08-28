@@ -3,6 +3,7 @@ from django.contrib.auth.models import User, Group
 from .models import Patient, Procedure, AdminStat, Notification
 from django.utils import timezone
 import re
+import base64
 
 # Serializer for the User model
 class UserSerializer(serializers.ModelSerializer):
@@ -89,14 +90,14 @@ class PatientSerializer(serializers.ModelSerializer):
 
     # Custom validation for the Patient model fields
     def validate(self, data):
-        gender_mapping = {
-            'M': 'Male',
-            'F': 'Female',
-            'O': 'Other',
-            'Male': 'Male',
-            'Female': 'Female',
-            'Other': 'Other'
-        }
+        # gender_mapping = {
+        #     'M': 'Male',
+        #     'F': 'Female',
+        #     'O': 'Other',
+        #     'Male': 'Male',
+        #     'Female': 'Female',
+        #     'Other': 'Other'
+        # }
 
         # Validate mobile number format (10 digits)
         mobile_number = data.get('mobile_number')
@@ -113,10 +114,10 @@ class PatientSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"pincode": "Pincode must be 6 digits long."})
 
         # Validate gender input and standardize it using a mapping
-        gender = data.get('gender').capitalize()
-        if gender not in gender_mapping:
-            raise serializers.ValidationError({"gender": "Gender must be one of the following: Male, Female, Others or M, F, O"})
-        data['gender'] = gender_mapping.get(gender, gender)
+        # gender = data.get('gender').capitalize()
+        # if gender not in gender_mapping:
+        #     raise serializers.ValidationError({"gender": "Gender must be one of the following: Male, Female, Others or M, F, O"})
+        # data['gender'] = gender_mapping.get(gender, gender)
 
         # Validate email format
         email = data.get('email')
@@ -130,12 +131,13 @@ class ProcedureSerializer(serializers.ModelSerializer):
     # Include nested serializers for patient and created_by fields
     patient = PatientSerializer(read_only=True)
     created_by = UserSerializer(read_only=True)
+    report_base64 = serializers.SerializerMethodField()
 
     class Meta:
         model = Procedure
         fields = [
             'id', 'patient', 'status', 'procedure_datetime', 'category',
-            'procedure_name', 'clinic_address', 'notes', 'report', 'created_by', 'created_date', 'updated_date'
+            'procedure_name', 'clinic_address', 'notes', 'report', 'report_base64', 'created_by', 'created_date', 'updated_date'
         ]
 
         # `created_date` and `updated_date` are read-only as they are set automatically
@@ -146,29 +148,25 @@ class ProcedureSerializer(serializers.ModelSerializer):
 
     # Custom validation for the Procedure model fields
     def validate(self, data):
-        # Validate the status field if provided
-        if 'status' in data:
-            status = data.get('status').lower()
-            valid_statuses = ['preparation', 'in-progress', 'not-done', 'on-hold', 'stopped', 'completed', 'entered-in-error', 'unknown']
-            if status not in valid_statuses:
-                raise serializers.ValidationError({"status": f"Status must be one of the following: {', '.join(valid_statuses)}."})
-            data['status'] = status
-
-        # Validate the category field if provided
-        if 'category' in data:
-            category = data.get('category').lower()
-            valid_categories = ['psychiatry', 'counseling', 'surgical', 'diagnostic', 'chiropractic', 'social-service']
-            if category not in valid_categories:
-                raise serializers.ValidationError({"category": f"Category must be one of the following: {', '.join(valid_categories)}."})
-            data['category'] = category
-
         # Validate the procedure_datetime field to ensure it is not in the future
         if 'procedure_datetime' in data:
             procedure_datetime = data.get('procedure_datetime')
             if procedure_datetime > timezone.now():
                 raise serializers.ValidationError({"procedure_datetime": "Procedure date cannot be in the future."})
+            
+        if 'report' in data:
+            report = data.get('report')
+            if report and not report.name.endswith('.pdf'):
+                raise serializers.ValidationError({"report": "Only PDF files are accepted."})
 
         return data
+    
+    def get_report_base64(self, obj):
+        if obj.report:
+            with open(obj.report.path.replace('\\', '/'), 'rb') as file:
+                file_content = file.read()
+                return base64.b64encode(file_content).decode('utf-8')
+        return None
     
 # Serializer for the AdminStat model
 class AdminStatSerializer(serializers.ModelSerializer):

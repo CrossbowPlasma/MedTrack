@@ -62,7 +62,7 @@ class Procedure(models.Model):
     procedure_name = models.CharField(max_length=100)
     clinic_address = models.TextField()
     notes = models.TextField(blank=True, null=True)
-    report = models.FileField(upload_to='reports/', blank=True, null=True)
+    report = models.FileField(upload_to='report/', blank=True, null=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
     created_date = models.DateTimeField(auto_now_add=True)
     updated_date = models.DateTimeField(auto_now=True)
