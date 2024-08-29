@@ -1,6 +1,7 @@
 # Ignore Python compiled files
 *.pyc
 __pycache__/
+media/
 
 # Ignore virtual environment directory
 #venv/
@@ -11,5 +12,5 @@ __pycache__/
 # Ignore log files
 #*.log
 
-# Ignore database files
+# Ignore database files if using SQLitedb
 #*.sqlite3

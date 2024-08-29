@@ -5,16 +5,16 @@ from django.utils.translation import gettext_lazy as _
 
 class Patient(models.Model):
     GENDER_CHOICES = [
-        ('M', _('Male')),
-        ('F', _('Female')),
-        ('O', _('Other')),
+        ('Male', 'Male'),
+        ('Female', 'Female'),
+        ('Other', 'Other'),
     ]
 
     first_name = models.CharField(max_length=50)
     last_name = models.CharField(max_length=50)
     mobile_number = models.CharField(max_length=10)
     address = models.TextField()
-    gender = models.CharField(max_length=1, choices=GENDER_CHOICES)
+    gender = models.CharField(choices=GENDER_CHOICES)
     birthdate = models.DateField()
     email = models.EmailField()
     city = models.CharField(max_length=100)
@@ -23,6 +23,7 @@ class Patient(models.Model):
     emergency_contact_name = models.CharField(max_length=100)
     emergency_contact_mobile_number = models.CharField(max_length=10)
     language = models.CharField(max_length=50)
+    created_date = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
@@ -55,14 +56,16 @@ class Procedure(models.Model):
     ]
 
     patient = models.ForeignKey('Patient', on_delete=models.CASCADE, related_name='procedures')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES)
+    status = models.CharField(choices=STATUS_CHOICES)
     procedure_datetime = models.DateTimeField()
-    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES)
+    category = models.CharField(choices=CATEGORY_CHOICES)
     procedure_name = models.CharField(max_length=100)
     clinic_address = models.TextField()
     notes = models.TextField(blank=True, null=True)
-    report = models.FileField(upload_to='reports/', blank=True, null=True)
+    report = models.FileField(upload_to='report/', blank=True, null=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_date = models.DateTimeField(auto_now_add=True)
+    updated_date = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.procedure_name} - {self.patient.first_name} {self.patient.last_name}"
@@ -92,13 +95,12 @@ class AdminStat(models.Model):
 class Notification(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     message = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Notification for {self.user.username} at {self.created_at}"
-
-
+        return f"Notification for {self.user.username} at {self.timestamp}"
+    
     class Meta:
-        ordering = ['-created_at']
+        ordering = ['-timestamp']
         verbose_name = _('Notification')
         verbose_name_plural = _('Notifications')
