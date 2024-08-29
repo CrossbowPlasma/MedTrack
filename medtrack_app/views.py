@@ -177,6 +177,7 @@ class PatientView(APIView):
             'Other': 'Other'
         }
 
+        # Handle full name and abbreviated case insentive genders inputs
         data = request.data.copy()
         gender = data.get('gender').capitalize()
         if gender:
@@ -224,6 +225,7 @@ class ProcedureView(APIView):
         except Patient.DoesNotExist:
             return Response({"patient": "Patient does not exist."}, status=status.HTTP_404_NOT_FOUND)
 
+        # Convert 'status' and 'category' field to lowercase
         data = request.data.copy()
         if data.get('status'):
             data['status'] = data['status'].lower()
@@ -246,6 +248,7 @@ class ProcedureView(APIView):
         except Procedure.DoesNotExist:
             return Response({"detail": "Procedure not found."}, status=status.HTTP_404_NOT_FOUND)
         
+        # Convert 'status' and 'category' field to lowercase
         data = request.data.copy()
         if data.get('status'):
             data['status'] = data['status'].lower()
