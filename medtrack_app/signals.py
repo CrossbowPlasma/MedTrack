@@ -52,18 +52,22 @@ def procedure_created_or_updated(sender, instance, created, **kwargs):
         admin_stat.total_procedures += 1
         admin_stat.save()
 
+# Signal receiver to delete the old file when a Procedure is updated with a new file
 @receiver(pre_save, sender=Procedure)
 def delete_old_file_on_update(sender, instance, **kwargs):
+    # Check if this is an update (existing procedure)
     if instance.pk:
         try:
             old_file = Procedure.objects.get(pk=instance.pk).report
         except Procedure.DoesNotExist:
             return
         else:
+            # Check if the old file exists and is different from the new one
             if old_file and old_file != instance.report:
                 if os.path.isfile(old_file.path):
                     os.remove(old_file.path)
 
+# Signal receiver to delete the report file from the filesystem when a Procedure is deleted
 @receiver(post_delete, sender=Procedure)
 def delete_file_on_delete(sender, instance, **kwargs):
     if instance.report:

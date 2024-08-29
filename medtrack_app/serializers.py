@@ -141,6 +141,7 @@ class ProcedureSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({"procedure_datetime": "Procedure date cannot be in the future."})
             
         if 'report' in data:
+        # Ensure only PDF files are accepted for the 'report' field
             report = data.get('report')
             if report and not report.name.endswith('.pdf'):
                 raise serializers.ValidationError({"report": "Only PDF files are accepted."})
@@ -148,6 +149,7 @@ class ProcedureSerializer(serializers.ModelSerializer):
         return data
     
     def get_report_base64(self, obj):
+    # Return the base64-encoded string of the report file, if it exists
         if obj.report:
             with open(obj.report.path.replace('\\', '/'), 'rb') as file:
                 file_content = file.read()
